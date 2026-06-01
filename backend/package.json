@@ -1,0 +1,41 @@
+{
+  "name": "crm-ads-backend",
+  "version": "1.0.0",
+  "description": "CRM completo para Google Ads e Meta Ads com tracking avançado",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "worker": "node src/workers/index.js",
+    "db:migrate": "node src/config/migrate.js",
+    "db:seed": "node src/config/seed.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.11.5",
+    "redis": "^4.6.13",
+    "bull": "^4.12.2",
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "dotenv": "^16.4.5",
+    "express-rate-limit": "^7.3.1",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^10.0.0",
+    "dayjs": "^1.11.11",
+    "googleapis": "^140.0.1",
+    "google-ads-api": "^23.0.0",
+    "morgan": "^1.10.0",
+    "compression": "^1.7.4",
+    "express-validator": "^7.1.0",
+    "crypto": "^1.0.1",
+    "node-cron": "^3.0.3",
+    "winston": "^3.13.0",
+    "pino": "^9.2.0",
+    "pino-pretty": "^11.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
