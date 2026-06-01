@@ -44,14 +44,19 @@ async function changePassword(req, res) {
     return res.status(400).json({ error: 'Dados inválidos. Senha mínimo 8 caracteres.' });
   }
 
-  const { rows } = await db.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
-  if (!await bcrypt.compare(currentPassword, rows[0].password_hash)) {
-    return res.status(401).json({ error: 'Senha atual incorreta' });
-  }
+  try {
+    const { rows } = await db.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+    if (!await bcrypt.compare(currentPassword, rows[0].password_hash)) {
+      return res.status(401).json({ error: 'Senha atual incorreta' });
+    }
 
-  const hash = await bcrypt.hash(newPassword, 10);
-  await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [hash, req.user.id]);
-  res.json({ message: 'Senha alterada com sucesso' });
+    const hash = await bcrypt.hash(newPassword, 10);
+    await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [hash, req.user.id]);
+    res.json({ message: 'Senha alterada com sucesso' });
+  } catch (err) {
+    console.error('changePassword error:', err);
+    res.status(500).json({ error: 'Erro ao alterar senha' });
+  }
 }
 
 module.exports = { login, me, changePassword };
