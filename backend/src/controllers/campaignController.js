@@ -11,7 +11,7 @@ async function list(req, res) {
     let p = 1;
     if (platform) { conditions.push(`platform = $${p++}`); params.push(platform); }
     if (status) { conditions.push(`status = $${p++}`); params.push(status); }
-    if (ad_account_id) { conditions.push(`raw_data->>'campaign' LIKE $${p++}`); params.push(`%"account_id":"${ad_account_id}"%`); }
+    if (ad_account_id) { conditions.push(`raw_data->>'ad_account_id' = $${p++}`); params.push(ad_account_id); }
 
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
     const offset = (parseInt(page) - 1) * parseInt(limit);
