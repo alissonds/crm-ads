@@ -517,6 +517,43 @@ INSERT INTO traffic_sources (name, type, platform) VALUES
   ('Tráfego Direto', 'direct', 'none')
 ON CONFLICT DO NOTHING;
 
+-- ============================================================
+-- CONFIGURAÇÕES DE CLIENTE (conta Meta + WhatsApp por cliente)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS client_configs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  meta_ad_account_id VARCHAR(100),
+  meta_ad_account_name VARCHAR(255),
+  whatsapp_phone_number_id VARCHAR(100),
+  whatsapp_display_number VARCHAR(30),
+  notes TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- ============================================================
+-- MENSAGENS WHATSAPP (histórico de conversa por lead)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS whatsapp_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+  wa_message_id VARCHAR(255) UNIQUE,
+  direction VARCHAR(3) CHECK (direction IN ('in', 'out')) DEFAULT 'in',
+  message_type VARCHAR(30) DEFAULT 'text',
+  content TEXT,
+  metadata JSONB DEFAULT '{}',
+  sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_lead ON whatsapp_messages(lead_id);
+CREATE INDEX IF NOT EXISTS idx_client_configs_user ON client_configs(user_id);
+CREATE INDEX IF NOT EXISTS idx_client_configs_phone ON client_configs(whatsapp_phone_number_id);
+CREATE INDEX IF NOT EXISTS idx_client_configs_account ON client_configs(meta_ad_account_id);
+
 -- Admin padrão (senha: Admin@123)
 INSERT INTO users (name, email, password_hash, role) VALUES
   ('Admin', 'admin@crm.local', '$2a$10$LFJotB0eH3vawav/nw5Rx.iFE.FzfoGeQ3m.hjuo/W7ZqRLQo3PnG', 'admin')

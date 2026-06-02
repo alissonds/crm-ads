@@ -13,6 +13,7 @@ const webhookCtrl = require('../controllers/webhookController');
 const campaignCtrl = require('../controllers/campaignController');
 const automationCtrl = require('../controllers/automationController');
 const conversionCtrl = require('../controllers/conversionController');
+const clientConfigCtrl = require('../controllers/clientConfigController');
 
 // --- AUTH ---
 router.post('/auth/login', authCtrl.login);
@@ -74,6 +75,13 @@ router.post('/webhook/whatsapp', webhookLimiter, webhookCtrl.receiveWhatsApp);
 router.post('/webhook/lead/:token', webhookLimiter, webhookCtrl.receiveGeneric);
 router.get('/webhook/configs', authenticate, webhookCtrl.listConfigs);
 router.post('/webhook/configs', authenticate, webhookCtrl.createConfig);
+
+// --- CLIENT CONFIGS ---
+router.get('/client-configs/meta-accounts', authenticate, clientConfigCtrl.listMetaAccounts);
+router.get('/client-configs', authenticate, clientConfigCtrl.listConfigs);
+router.post('/client-configs', authenticate, clientConfigCtrl.upsertConfig);
+router.get('/client-configs/:userId', authenticate, clientConfigCtrl.getConfig);
+router.get('/leads/:leadId/messages', authenticate, clientConfigCtrl.getLeadMessages);
 
 // --- HEALTH ---
 router.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));

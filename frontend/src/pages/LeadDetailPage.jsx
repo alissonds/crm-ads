@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, MessageCircle, Phone, Mail, MapPin, Tag, Clock, Zap, DollarSign, Send } from 'lucide-react';
 import { leadsAPI, conversionsAPI } from '../services/api';
+import api from '../services/api';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -32,6 +33,12 @@ export default function LeadDetailPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['lead', id],
     queryFn: () => leadsAPI.getById(id).then(r => r.data),
+  });
+
+  const { data: messagesData } = useQuery({
+    queryKey: ['lead-messages', id],
+    queryFn: () => api.get(`/leads/${id}/messages`).then(r => r.data),
+    refetchInterval: 15000,
   });
 
   const updateMutation = useMutation({
@@ -194,6 +201,32 @@ export default function LeadDetailPage() {
                     <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">{a.touchpoint_order}</span>
                     <span className="flex-1 text-gray-700">{a.campaign_name || a.utm_campaign || a.utm_source}</span>
                     <span className="text-gray-400 text-xs">{(a.weight * 100).toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* WhatsApp Conversa */}
+          {messagesData?.messages?.length > 0 && (
+            <div className="card p-5">
+              <h3 className="font-semibold text-gray-700 text-sm mb-4 flex items-center gap-2">
+                <MessageCircle size={14} className="text-green-500" /> Conversa WhatsApp
+                <span className="ml-auto text-xs text-gray-400 font-normal">atualiza a cada 15s</span>
+              </h3>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {messagesData.messages.map((msg) => (
+                  <div key={msg.id} className={`flex ${msg.direction === 'out' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-xs px-3 py-2 rounded-2xl text-sm ${
+                      msg.direction === 'out'
+                        ? 'bg-green-500 text-white rounded-br-sm'
+                        : 'bg-gray-100 text-gray-800 rounded-bl-sm'
+                    }`}>
+                      <p>{msg.content}</p>
+                      <p className={`text-xs mt-1 ${msg.direction === 'out' ? 'text-green-100' : 'text-gray-400'}`}>
+                        {msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>

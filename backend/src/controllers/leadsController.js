@@ -19,7 +19,9 @@ async function list(req, res) {
     if (status) { conditions.push(`l.status = $${p++}`); params.push(status); }
     if (utm_source) { conditions.push(`l.utm_source = $${p++}`); params.push(utm_source); }
     if (campaign_id) { conditions.push(`l.campaign_id = $${p++}`); params.push(campaign_id); }
-    if (assigned_to) { conditions.push(`l.assigned_to = $${p++}`); params.push(assigned_to); }
+    // Clientes (não-admin) só veem seus próprios leads
+    const effectiveAssignedTo = req.user.role !== 'admin' ? req.user.id : assigned_to;
+    if (effectiveAssignedTo) { conditions.push(`l.assigned_to = $${p++}`); params.push(effectiveAssignedTo); }
     if (priority) { conditions.push(`l.priority = $${p++}`); params.push(priority); }
     if (tag) { conditions.push(`$${p++} = ANY(l.tags)`); params.push(tag); }
     if (date_from) { conditions.push(`l.created_at >= $${p++}`); params.push(date_from); }

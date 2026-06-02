@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Megaphone, Activity,
   BarChart3, Zap, RefreshCw, Webhook, LogOut,
-  TrendingUp, UserCog,
+  TrendingUp, UserCog, Building2,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import clsx from 'clsx';
@@ -16,6 +16,7 @@ const NAV = [
   { to: '/automations', icon: Zap, label: 'Automações' },
   { to: '/conversions', icon: RefreshCw, label: 'Conversões' },
   { to: '/webhooks', icon: Webhook, label: 'Webhooks' },
+  { to: '/accounts', icon: Building2, label: 'Contas', adminOnly: true },
   { to: '/users', icon: UserCog, label: 'Usuários', adminOnly: true },
 ];
 
