@@ -90,3 +90,10 @@ export const webhooksAPI = {
   listConfigs: () => api.get('/webhook/configs'),
   createConfig: (data) => api.post('/webhook/configs', data),
 };
+
+// Users
+export const usersAPI = {
+  list: () => api.get('/users'),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+};

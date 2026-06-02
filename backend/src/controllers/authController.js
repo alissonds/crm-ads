@@ -59,4 +59,94 @@ async function changePassword(req, res) {
   }
 }
 
-module.exports = { login, me, changePassword };
+const MAX_USERS = 5;
+
+async function listUsers(req, res) {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, name, email, role, is_active, last_login_at, created_at FROM users ORDER BY created_at ASC`
+    );
+    res.json({ users: rows, total: rows.length, max: MAX_USERS });
+  } catch (err) {
+    console.error('listUsers error:', err);
+    res.status(500).json({ error: 'Erro ao listar usuários' });
+  }
+}
+
+async function createUser(req, res) {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Apenas admins podem criar usuários' });
+
+  const { name, email, password, role = 'agent' } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
+  if (password.length < 8) return res.status(400).json({ error: 'Senha mínimo 8 caracteres' });
+  if (!['admin', 'manager', 'agent'].includes(role)) return res.status(400).json({ error: 'Role inválido' });
+
+  try {
+    const { rows: count } = await db.query(`SELECT COUNT(*) FROM users WHERE is_active = true`);
+    if (parseInt(count[0].count) >= MAX_USERS) {
+      return res.status(400).json({ error: `Limite de ${MAX_USERS} usuários atingido` });
+    }
+
+    const { rows: existing } = await db.query(`SELECT id FROM users WHERE email = $1`, [email.toLowerCase().trim()]);
+    if (existing[0]) return res.status(400).json({ error: 'Email já cadastrado' });
+
+    const hash = await bcrypt.hash(password, 10);
+    const { rows } = await db.query(`
+      INSERT INTO users (name, email, password_hash, role, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, NOW(), NOW())
+      RETURNING id, name, email, role, is_active, created_at
+    `, [name, email.toLowerCase().trim(), hash, role]);
+
+    res.status(201).json({ user: rows[0] });
+  } catch (err) {
+    console.error('createUser error:', err);
+    res.status(500).json({ error: 'Erro ao criar usuário' });
+  }
+}
+
+async function updateUser(req, res) {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Apenas admins podem editar usuários' });
+
+  const { id } = req.params;
+  const { name, email, role, is_active, password } = req.body;
+
+  try {
+    const { rows: existing } = await db.query(`SELECT * FROM users WHERE id = $1`, [id]);
+    if (!existing[0]) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    // Impede desativar o próprio admin
+    if (id === req.user.id && is_active === false) {
+      return res.status(400).json({ error: 'Você não pode desativar sua própria conta' });
+    }
+
+    const updates = [];
+    const params = [];
+    let p = 1;
+
+    if (name) { updates.push(`name = $${p++}`); params.push(name); }
+    if (email) { updates.push(`email = $${p++}`); params.push(email.toLowerCase().trim()); }
+    if (role && ['admin', 'manager', 'agent'].includes(role)) { updates.push(`role = $${p++}`); params.push(role); }
+    if (is_active !== undefined) { updates.push(`is_active = $${p++}`); params.push(is_active); }
+    if (password) {
+      if (password.length < 8) return res.status(400).json({ error: 'Senha mínimo 8 caracteres' });
+      const hash = await bcrypt.hash(password, 10);
+      updates.push(`password_hash = $${p++}`); params.push(hash);
+    }
+
+    if (!updates.length) return res.status(400).json({ error: 'Nenhum campo para atualizar' });
+    updates.push(`updated_at = NOW()`);
+    params.push(id);
+
+    const { rows } = await db.query(
+      `UPDATE users SET ${updates.join(', ')} WHERE id = $${p} RETURNING id, name, email, role, is_active, created_at`,
+      params
+    );
+
+    res.json({ user: rows[0] });
+  } catch (err) {
+    console.error('updateUser error:', err);
+    res.status(500).json({ error: 'Erro ao atualizar usuário' });
+  }
+}
+
+module.exports = { login, me, changePassword, listUsers, createUser, updateUser };

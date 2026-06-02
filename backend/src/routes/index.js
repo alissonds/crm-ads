@@ -19,6 +19,11 @@ router.post('/auth/login', authCtrl.login);
 router.get('/auth/me', authenticate, authCtrl.me);
 router.put('/auth/password', authenticate, authCtrl.changePassword);
 
+// --- USUÁRIOS (admin only) ---
+router.get('/users', authenticate, authCtrl.listUsers);
+router.post('/users', authenticate, authCtrl.createUser);
+router.put('/users/:id', authenticate, authCtrl.updateUser);
+
 // --- LEADS ---
 router.get('/leads', authenticate, apiLimiter, leadsCtrl.list);
 router.get('/leads/stats', authenticate, leadsCtrl.stats);

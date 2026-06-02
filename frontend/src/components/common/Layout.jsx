@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Megaphone, Activity,
   BarChart3, Zap, RefreshCw, Webhook, LogOut,
-  TrendingUp, ChevronRight,
+  TrendingUp, UserCog,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import clsx from 'clsx';
@@ -16,6 +16,7 @@ const NAV = [
   { to: '/automations', icon: Zap, label: 'Automações' },
   { to: '/conversions', icon: RefreshCw, label: 'Conversões' },
   { to: '/webhooks', icon: Webhook, label: 'Webhooks' },
+  { to: '/users', icon: UserCog, label: 'Usuários', adminOnly: true },
 ];
 
 export default function Layout() {
@@ -41,7 +42,7 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {NAV.map(({ to, icon: Icon, label }) => (
+          {NAV.filter(item => !item.adminOnly || user?.role === 'admin').map(({ to, icon: Icon, label }) => (
             <NavLink key={to} to={to} className={({ isActive }) => clsx(
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
               isActive
