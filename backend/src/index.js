@@ -58,13 +58,32 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Erro interno do servidor' });
 });
 
-// Workers (cron jobs)
-if (process.env.ENABLE_WORKERS !== 'false') {
-  require('./workers/index');
+// Migração automática ao iniciar
+async function startServer() {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const schemaPath = path.resolve(__dirname, '../../database/schema.sql');
+    if (fs.existsSync(schemaPath)) {
+      const db = require('./config/database');
+      const sql = fs.readFileSync(schemaPath, 'utf8');
+      await db.query(sql);
+      logger.info('✅ Schema do banco aplicado');
+    }
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Aviso na migração (não crítico)');
+  }
+
+  // Workers (cron jobs)
+  if (process.env.ENABLE_WORKERS !== 'false') {
+    require('./workers/index');
+  }
+
+  app.listen(PORT, () => {
+    logger.info(`CRM ADS Backend rodando na porta ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+  });
 }
 
-app.listen(PORT, () => {
-  logger.info(`CRM ADS Backend rodando na porta ${PORT} [${process.env.NODE_ENV || 'development'}]`);
-});
+startServer();
 
 module.exports = app;
