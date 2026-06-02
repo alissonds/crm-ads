@@ -136,7 +136,7 @@ export default function CampaignsPage() {
                   <td className="px-4 py-3 text-gray-600">{fmtR(c.cpc)}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{fmtR(c.spend)}</td>
                   <td className="px-4 py-3 text-gray-600">{fmt(c.conversions)}</td>
-                  <td className="px-4 py-3 font-semibold text-green-600">{c.roas ? c.roas.toFixed(2) + 'x' : '—'}</td>
+                  <td className="px-4 py-3 font-semibold text-green-600">{c.roas ? parseFloat(c.roas).toFixed(2) + 'x' : '—'}</td>
                   <td className="px-4 py-3 text-gray-600">
                     {c.crm_leads > 0 ? fmtR(parseFloat(c.spend || 0) / parseInt(c.crm_leads)) : '—'}
                   </td>
