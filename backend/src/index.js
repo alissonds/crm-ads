@@ -63,7 +63,7 @@ async function startServer() {
   try {
     const fs = require('fs');
     const path = require('path');
-    const schemaPath = path.resolve(__dirname, '../../database/schema.sql');
+    const schemaPath = path.resolve(__dirname, '../schema.sql');
     if (fs.existsSync(schemaPath)) {
       const db = require('./config/database');
       const sql = fs.readFileSync(schemaPath, 'utf8');
