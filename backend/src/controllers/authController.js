@@ -61,6 +61,39 @@ async function changePassword(req, res) {
 
 const MAX_USERS = 5;
 
+async function register(req, res) {
+  const { name, email, password, whatsapp_number, company } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
+  if (password.length < 8) return res.status(400).json({ error: 'Senha mínimo 8 caracteres' });
+
+  try {
+    const { rows: existing } = await db.query(`SELECT id FROM users WHERE email = $1`, [email.toLowerCase().trim()]);
+    if (existing[0]) return res.status(400).json({ error: 'Email já cadastrado' });
+
+    const { rows: count } = await db.query(`SELECT COUNT(*) FROM users`);
+    if (parseInt(count[0].count) >= MAX_USERS) {
+      return res.status(400).json({ error: 'Limite de usuários atingido. Entre em contato com o administrador.' });
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    const { rows } = await db.query(`
+      INSERT INTO users (name, email, password_hash, role, is_active, custom_fields, created_at, updated_at)
+      VALUES ($1, $2, $3, 'agent', false, $4, NOW(), NOW())
+      RETURNING id, name, email, role, is_active, created_at
+    `, [
+      name,
+      email.toLowerCase().trim(),
+      hash,
+      JSON.stringify({ whatsapp_number: whatsapp_number || null, company: company || null, pending_approval: true }),
+    ]);
+
+    res.status(201).json({ message: 'Cadastro enviado! Aguarde a aprovação do administrador.', user: rows[0] });
+  } catch (err) {
+    console.error('register error:', err);
+    res.status(500).json({ error: 'Erro ao criar cadastro' });
+  }
+}
+
 async function listUsers(req, res) {
   try {
     const { rows } = await db.query(
@@ -149,4 +182,4 @@ async function updateUser(req, res) {
   }
 }
 
-module.exports = { login, me, changePassword, listUsers, createUser, updateUser };
+module.exports = { login, me, changePassword, register, listUsers, createUser, updateUser };

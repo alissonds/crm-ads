@@ -78,7 +78,9 @@ export default function UsersPage() {
 
   const isAdmin = me?.role === 'admin';
   const users = data?.users || [];
-  const total = data?.total || 0;
+  const active = users.filter(u => u.is_active);
+  const pending = users.filter(u => !u.is_active);
+  const total = active.length;
   const max = data?.max || 5;
   const canCreate = isAdmin && total < max;
 
@@ -119,12 +121,61 @@ export default function UsersPage() {
         )}
       </div>
 
+      {/* Pendentes */}
+      {isAdmin && pending.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-amber-600 uppercase tracking-wide mb-3 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse inline-block" />
+            Aguardando aprovação ({pending.length})
+          </h2>
+          <div className="bg-white rounded-xl border border-amber-200 divide-y divide-amber-50">
+            {pending.map((u) => {
+              const extra = u.custom_fields || {};
+              return (
+                <div key={u.id} className="flex items-center gap-4 px-5 py-4">
+                  <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    {u.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{u.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                    {(extra.company || extra.whatsapp_number) && (
+                      <p className="text-xs text-gray-400 truncate mt-0.5">
+                        {[extra.company, extra.whatsapp_number].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-amber-100 text-amber-700">Pendente</span>
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 ml-2">
+                      <button
+                        onClick={() => toggleMutation.mutate({ id: u.id, is_active: true })}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        <Check size={13} /> Aprovar
+                      </button>
+                      <button
+                        onClick={() => openEdit(u)}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Editar"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Lista */}
       {isLoading ? (
         <div className="text-center py-12 text-gray-400">Carregando...</div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
-          {users.map((u) => (
+          {active.map((u) => (
             <div key={u.id} className="flex items-center gap-4 px-5 py-4">
               <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                 {u.name.charAt(0).toUpperCase()}

@@ -16,6 +16,7 @@ const conversionCtrl = require('../controllers/conversionController');
 
 // --- AUTH ---
 router.post('/auth/login', authCtrl.login);
+router.post('/auth/register', authCtrl.register);
 router.get('/auth/me', authenticate, authCtrl.me);
 router.put('/auth/password', authenticate, authCtrl.changePassword);
 

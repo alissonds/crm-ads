@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { TrendingUp, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@crm.local');
-  const [password, setPassword] = useState('Admin@123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const { login, loading } = useAuthStore();
   const navigate = useNavigate();
@@ -24,7 +24,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-2xl">
             <TrendingUp size={28} className="text-white" />
@@ -33,7 +32,6 @@ export default function LoginPage() {
           <p className="text-gray-400 mt-1">Google Ads & Meta Ads Intelligence</p>
         </div>
 
-        {/* Form */}
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
@@ -72,9 +70,12 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-white/10">
-            <p className="text-xs text-gray-500 text-center">
-              Admin padrão: <span className="text-gray-300">admin@crm.local</span> / <span className="text-gray-300">Admin@123</span>
+          <div className="mt-6 pt-6 border-t border-white/10 text-center">
+            <p className="text-sm text-gray-400">
+              Ainda não tem acesso?{' '}
+              <Link to="/register" className="text-blue-400 hover:text-blue-300 font-medium">
+                Solicitar cadastro
+              </Link>
             </p>
           </div>
         </div>

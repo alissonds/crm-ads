@@ -13,6 +13,7 @@ import AutomationsPage from './pages/AutomationsPage';
 import ConversionsPage from './pages/ConversionsPage';
 import WebhooksPage from './pages/WebhooksPage';
 import UsersPage from './pages/UsersPage';
+import RegisterPage from './pages/RegisterPage';
 
 function PrivateRoute({ children }) {
   const token = useAuthStore((s) => s.token);
@@ -29,6 +30,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
