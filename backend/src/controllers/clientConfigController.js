@@ -54,13 +54,17 @@ async function listMetaAccounts(req, res) {
     if (errors.length) console.error('Meta API errors:', errors);
 
     // Busca configurações já salvas para cruzar com os dados da API
-    const { rows: configs } = await db.query(
-      `SELECT cc.*, u.name as client_name, u.email as client_email
-       FROM client_configs cc
-       JOIN users u ON cc.user_id = u.id`
-    );
     const configMap = {};
-    for (const c of configs) configMap[c.meta_ad_account_id] = c;
+    try {
+      const { rows: configs } = await db.query(
+        `SELECT cc.*, u.name as client_name, u.email as client_email
+         FROM client_configs cc
+         JOIN users u ON cc.user_id = u.id`
+      );
+      for (const c of configs) configMap[c.meta_ad_account_id] = c;
+    } catch (e) {
+      errors.push('db: ' + e.message);
+    }
 
     const accounts = Object.values(accountMap).map(acc => ({
       ...acc,
