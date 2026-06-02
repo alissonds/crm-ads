@@ -87,7 +87,7 @@ async function register(req, res) {
     res.status(201).json({ message: 'Cadastro enviado! Aguarde a aprovação do administrador.', user: rows[0] });
   } catch (err) {
     console.error('register error:', err);
-    res.status(500).json({ error: 'Erro ao criar cadastro' });
+    res.status(500).json({ error: err.message || 'Erro ao criar cadastro' });
   }
 }
 
