@@ -104,6 +104,17 @@ class MetaAdsService {
           ]);
           total++;
 
+          // Sincroniza conjuntos de anúncio desta campanha
+          try {
+            const { rows: [camp] } = await db.query(
+              `SELECT id FROM campaigns WHERE external_id = $1 AND platform = 'meta_ads'`,
+              [c.id]
+            );
+            if (camp) await this._syncAdSets(c.id, camp.id, account.id, dailySince, dailyUntil);
+          } catch (err) {
+            console.error(`Erro ao sincronizar adsets campanha ${c.id}:`, err.message);
+          }
+
           // Salva métricas diárias para filtros por data
           try {
             const { rows: [camp] } = await db.query(
@@ -150,6 +161,112 @@ class MetaAdsService {
       }
     }
     return total;
+  }
+
+  async _syncAdSets(campaignExternalId, campaignDbId, accountId, dailySince, dailyUntil) {
+    const fields = 'id,name,status,daily_budget,bid_amount';
+    const insFields = 'impressions,clicks,spend,ctr,cpc,actions,action_values';
+
+    const data = await this.get(`/${campaignExternalId}/adsets`, { fields, limit: 200 });
+    for (const adset of data.data || []) {
+      let ins = {};
+      try {
+        const r = await this.get(`/${adset.id}/insights`, { fields: insFields, date_preset: 'last_30d' });
+        ins = r.data?.[0] || {};
+      } catch {}
+
+      const spend = parseFloat(ins.spend || 0);
+      const convs = parseInt(ins.actions?.find(a => a.action_type === 'purchase')?.value || 0);
+
+      const { rows: [saved] } = await db.query(`
+        INSERT INTO ad_groups (id, campaign_id, external_id, name, platform, status, bid_amount, impressions, clicks, spend, conversions, raw_data, last_synced_at, created_at)
+        VALUES (uuid_generate_v4(),$1,$2,$3,'meta_ads',$4,$5,$6,$7,$8,$9,$10,NOW(),NOW())
+        ON CONFLICT (external_id, platform) DO UPDATE SET
+          name=EXCLUDED.name, status=EXCLUDED.status,
+          impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks,
+          spend=EXCLUDED.spend, conversions=EXCLUDED.conversions,
+          raw_data=EXCLUDED.raw_data, last_synced_at=NOW()
+        RETURNING id
+      `, [
+        campaignDbId, adset.id, adset.name, adset.status?.toLowerCase() || 'active',
+        adset.bid_amount ? parseFloat(adset.bid_amount) / 100 : null,
+        parseInt(ins.impressions || 0), parseInt(ins.clicks || 0), spend, convs,
+        JSON.stringify({ adset, ins, ad_account_id: accountId }),
+      ]);
+
+      // Métricas diárias do conjunto
+      if (saved) {
+        try {
+          const dailyRes = await this.get(`/${adset.id}/insights`, {
+            fields: insFields,
+            time_increment: 1,
+            time_range: JSON.stringify({ since: dailySince, until: dailyUntil }),
+            limit: 100,
+          });
+          const dailyRows = dailyRes.data || [];
+          if (dailyRows.length) {
+            await db.query(
+              `DELETE FROM daily_metrics WHERE ad_group_id=$1 AND date BETWEEN $2 AND $3 AND keyword_id IS NULL`,
+              [saved.id, dailySince, dailyUntil]
+            );
+            for (const day of dailyRows) {
+              const ds = parseFloat(day.spend || 0);
+              const dcv = parseFloat(day.action_values?.find(a => a.action_type === 'purchase')?.value || 0);
+              await db.query(`
+                INSERT INTO daily_metrics (id,date,platform,campaign_id,ad_group_id,impressions,clicks,spend,conversion_value,roas,cpc,ctr,created_at)
+                VALUES (uuid_generate_v4(),$1,'meta_ads',$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+              `, [
+                day.date_start, campaignDbId, saved.id,
+                parseInt(day.impressions || 0), parseInt(day.clicks || 0),
+                ds, dcv, ds > 0 ? dcv / ds : null,
+                parseFloat(day.cpc || 0), parseFloat(day.ctr || 0),
+              ]);
+            }
+          }
+        } catch (err) {
+          console.error(`Daily adset metrics error ${adset.id}:`, err.message);
+        }
+
+        // Sincroniza anúncios do conjunto
+        try {
+          const adsData = await this.get(`/${adset.id}/ads`, {
+            fields: 'id,name,status,creative{thumbnail_url,title,body,object_story_spec}',
+            limit: 100,
+          });
+          for (const ad of adsData.data || []) {
+            let adIns = {};
+            try {
+              const ar = await this.get(`/${ad.id}/insights`, { fields: insFields, date_preset: 'last_30d' });
+              adIns = ar.data?.[0] || {};
+            } catch {}
+
+            const adSpend = parseFloat(adIns.spend || 0);
+            await db.query(`
+              INSERT INTO ads (id, ad_group_id, campaign_id, external_id, name, platform, status,
+                headline, description, creative_url, impressions, clicks, spend, conversions, ctr, raw_data, last_synced_at, created_at)
+              VALUES (uuid_generate_v4(),$1,$2,$3,$4,'meta_ads',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW())
+              ON CONFLICT (external_id, platform) DO UPDATE SET
+                name=EXCLUDED.name, status=EXCLUDED.status,
+                impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks,
+                spend=EXCLUDED.spend, conversions=EXCLUDED.conversions,
+                ctr=EXCLUDED.ctr, raw_data=EXCLUDED.raw_data, last_synced_at=NOW()
+            `, [
+              saved.id, campaignDbId, ad.id, ad.name, ad.status?.toLowerCase() || 'active',
+              ad.creative?.title || null,
+              ad.creative?.body || ad.creative?.object_story_spec?.link_data?.message || null,
+              ad.creative?.thumbnail_url || null,
+              parseInt(adIns.impressions || 0), parseInt(adIns.clicks || 0),
+              adSpend,
+              parseInt(adIns.actions?.find(a => a.action_type === 'purchase')?.value || 0),
+              parseFloat(adIns.ctr || 0),
+              JSON.stringify({ ad, adIns }),
+            ]);
+          }
+        } catch (err) {
+          console.error(`Error syncing ads for adset ${adset.id}:`, err.message);
+        }
+      }
+    }
   }
 
   // Envia evento de Conversão para Meta (Conversions API)

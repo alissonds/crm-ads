@@ -51,6 +51,8 @@ router.get('/analytics/chart', authenticate, analyticsCtrl.dailyChart);
 // --- CAMPANHAS ---
 router.get('/campaigns', authenticate, campaignCtrl.list);
 router.get('/campaigns/insights', authenticate, campaignCtrl.getInsights);
+router.get('/campaigns/adsets/insights', authenticate, campaignCtrl.getAdSetsInsights);
+router.get('/campaigns/ads/insights', authenticate, campaignCtrl.getAdsInsights);
 router.get('/campaigns/:id', authenticate, campaignCtrl.getById);
 router.post('/campaigns/sync/google', authenticate, campaignCtrl.syncGoogle);
 router.post('/campaigns/sync/meta', authenticate, campaignCtrl.syncMeta);

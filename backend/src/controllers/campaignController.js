@@ -136,6 +136,96 @@ async function getInsights(req, res) {
   }
 }
 
+async function getAdSetsInsights(req, res) {
+  try {
+    const { date_from, date_to, campaign_id, ad_account_id } = req.query;
+    const df = date_from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const dt = date_to || new Date().toISOString().slice(0, 10);
+
+    const conditions = [];
+    const params = [df, dt];
+    let p = 3;
+    if (campaign_id) { conditions.push(`ag.campaign_id = $${p++}`); params.push(campaign_id); }
+    if (ad_account_id) { conditions.push(`c.raw_data->>'ad_account_id' = $${p++}`); params.push(ad_account_id); }
+    const where = conditions.length ? 'AND ' + conditions.join(' AND ') : '';
+
+    const { rows } = await db.query(`
+      SELECT
+        ag.id, ag.name, ag.platform, ag.status, ag.campaign_id,
+        c.name AS campaign_name,
+        COALESCE(SUM(dm.impressions),0)::bigint AS impressions,
+        COALESCE(SUM(dm.clicks),0)::bigint AS clicks,
+        COALESCE(SUM(dm.spend),0) AS spend,
+        COALESCE(SUM(dm.conversion_value),0) AS conversion_value,
+        CASE WHEN SUM(dm.clicks)>0 THEN SUM(dm.spend)/SUM(dm.clicks) ELSE 0 END AS cpc,
+        CASE WHEN SUM(dm.impressions)>0 THEN SUM(dm.clicks)::DECIMAL/SUM(dm.impressions)*100 ELSE 0 END AS ctr,
+        CASE WHEN SUM(dm.spend)>0 THEN SUM(dm.conversion_value)/SUM(dm.spend) ELSE NULL END AS roas,
+        COUNT(DISTINCT l.id) AS crm_leads,
+        (COUNT(dm.id)>0) AS has_daily_data
+      FROM ad_groups ag
+      JOIN campaigns c ON ag.campaign_id = c.id
+      LEFT JOIN daily_metrics dm
+        ON dm.ad_group_id = ag.id
+        AND dm.date BETWEEN $1 AND $2
+        AND dm.keyword_id IS NULL
+      LEFT JOIN leads l
+        ON l.ad_group_id = ag.id
+        AND l.created_at >= $1::timestamp
+        AND l.created_at < ($2::date + interval '1 day')
+      WHERE ag.platform = 'meta_ads' ${where}
+      GROUP BY ag.id, c.id
+      ORDER BY COALESCE(SUM(dm.spend),0) DESC, ag.spend DESC NULLS LAST
+    `, params);
+
+    res.json({ adsets: rows, period: { from: df, to: dt }, has_daily_data: rows.some(r => r.has_daily_data) });
+  } catch (err) {
+    console.error('getAdSetsInsights error:', err);
+    res.status(500).json({ error: 'Erro ao buscar conjuntos' });
+  }
+}
+
+async function getAdsInsights(req, res) {
+  try {
+    const { date_from, date_to, campaign_id, ad_group_id, ad_account_id } = req.query;
+    const df = date_from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const dt = date_to || new Date().toISOString().slice(0, 10);
+
+    const conditions = [];
+    const params = [df, dt];
+    let p = 3;
+    if (campaign_id) { conditions.push(`a.campaign_id = $${p++}`); params.push(campaign_id); }
+    if (ad_group_id) { conditions.push(`a.ad_group_id = $${p++}`); params.push(ad_group_id); }
+    if (ad_account_id) { conditions.push(`c.raw_data->>'ad_account_id' = $${p++}`); params.push(ad_account_id); }
+    const where = conditions.length ? 'AND ' + conditions.join(' AND ') : '';
+
+    const { rows } = await db.query(`
+      SELECT
+        a.id, a.name, a.platform, a.status,
+        a.headline, a.description, a.creative_url,
+        a.campaign_id, a.ad_group_id,
+        c.name AS campaign_name,
+        ag.name AS adset_name,
+        a.impressions, a.clicks, a.spend, a.conversions, a.ctr,
+        CASE WHEN a.clicks>0 THEN a.spend/a.clicks ELSE 0 END AS cpc,
+        COUNT(DISTINCT l.id) FILTER (
+          WHERE l.created_at >= $1::timestamp AND l.created_at < ($2::date + interval '1 day')
+        ) AS crm_leads
+      FROM ads a
+      JOIN campaigns c ON a.campaign_id = c.id
+      LEFT JOIN ad_groups ag ON a.ad_group_id = ag.id
+      LEFT JOIN leads l ON l.ad_id = a.id
+      WHERE a.platform = 'meta_ads' ${where}
+      GROUP BY a.id, c.id, ag.id
+      ORDER BY a.spend DESC NULLS LAST
+    `, params);
+
+    res.json({ ads: rows, period: { from: df, to: dt } });
+  } catch (err) {
+    console.error('getAdsInsights error:', err);
+    res.status(500).json({ error: 'Erro ao buscar anúncios' });
+  }
+}
+
 async function getRoas(req, res) {
   try {
     const { id } = req.params;
@@ -151,4 +241,4 @@ async function getRoas(req, res) {
   }
 }
 
-module.exports = { list, getById, syncGoogle, syncMeta, getRoas, getInsights };
+module.exports = { list, getById, syncGoogle, syncMeta, getRoas, getInsights, getAdSetsInsights, getAdsInsights };
