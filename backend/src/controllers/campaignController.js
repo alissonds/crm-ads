@@ -86,7 +86,10 @@ async function syncMeta(req, res) {
 
 async function getInsights(req, res) {
   try {
-    const { date_from, date_to, platform, ad_account_id } = req.query;
+    const { date_from, date_to, platform } = req.query;
+    const ad_account_id = req.user.role !== 'admin'
+      ? req.user.meta_ad_account_id
+      : (req.query.ad_account_id || null);
     const df = date_from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const dt = date_to || new Date().toISOString().slice(0, 10);
 
@@ -138,7 +141,10 @@ async function getInsights(req, res) {
 
 async function getAdSetsInsights(req, res) {
   try {
-    const { date_from, date_to, campaign_id, ad_account_id } = req.query;
+    const { date_from, date_to, campaign_id } = req.query;
+    const ad_account_id = req.user.role !== 'admin'
+      ? req.user.meta_ad_account_id
+      : (req.query.ad_account_id || null);
     const df = date_from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const dt = date_to || new Date().toISOString().slice(0, 10);
 
@@ -186,7 +192,10 @@ async function getAdSetsInsights(req, res) {
 
 async function getAdsInsights(req, res) {
   try {
-    const { date_from, date_to, campaign_id, ad_group_id, ad_account_id } = req.query;
+    const { date_from, date_to, campaign_id, ad_group_id } = req.query;
+    const ad_account_id = req.user.role !== 'admin'
+      ? req.user.meta_ad_account_id
+      : (req.query.ad_account_id || null);
     const df = date_from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const dt = date_to || new Date().toISOString().slice(0, 10);
 

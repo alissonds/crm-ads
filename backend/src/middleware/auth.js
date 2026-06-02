@@ -13,6 +13,16 @@ async function authenticate(req, res, next) {
     );
     if (!rows[0]) return res.status(401).json({ error: 'Usuário inativo ou não encontrado' });
     req.user = rows[0];
+
+    // Para não-admins: carrega a conta atribuída para filtrar dados automaticamente
+    if (req.user.role !== 'admin') {
+      const { rows: cfgRows } = await db.query(
+        'SELECT meta_ad_account_id FROM client_configs WHERE user_id = $1 AND is_active = true LIMIT 1',
+        [req.user.id]
+      );
+      req.user.meta_ad_account_id = cfgRows[0]?.meta_ad_account_id || null;
+    }
+
     next();
   } catch {
     return res.status(401).json({ error: 'Token inválido ou expirado' });

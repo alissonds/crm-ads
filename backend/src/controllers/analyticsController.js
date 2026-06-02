@@ -63,6 +63,11 @@ async function campaignPerformance(req, res) {
     const params = [df, dt];
     let p = 3;
     if (platform) { conditions.push(`c.platform = $${p++}`); params.push(platform); }
+    // Não-admins só veem a conta atribuída
+    if (req.user.role !== 'admin' && req.user.meta_ad_account_id) {
+      conditions.push(`c.raw_data->>'ad_account_id' = $${p++}`);
+      params.push(req.user.meta_ad_account_id);
+    }
 
     const { rows } = await db.query(`
       SELECT c.id, c.name, c.platform, c.status,
