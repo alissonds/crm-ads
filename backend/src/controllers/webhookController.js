@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const metaAds = require('../services/metaAdsService');
+const whatsapp = require('../services/whatsappService');
 const automationService = require('../services/automationService');
 
 function verifyMeta(req, res) {
@@ -135,4 +136,25 @@ function getNestedValue(obj, path) {
   return path.split('.').reduce((acc, key) => acc?.[key], obj);
 }
 
-module.exports = { verifyMeta, receiveMeta, receiveGeneric, listConfigs, createConfig };
+function verifyWhatsApp(req, res) {
+  return whatsapp.verifyWebhook(req, res);
+}
+
+async function receiveWhatsApp(req, res) {
+  // Responde 200 imediatamente para a Meta não reenviar
+  res.sendStatus(200);
+
+  const signature = req.headers['x-hub-signature-256'];
+  if (!whatsapp.validateSignature(JSON.stringify(req.body), signature)) {
+    console.warn('WhatsApp webhook: assinatura inválida');
+    return;
+  }
+
+  try {
+    await whatsapp.processWebhook(req.body);
+  } catch (err) {
+    console.error('WhatsApp webhook error:', err);
+  }
+}
+
+module.exports = { verifyMeta, receiveMeta, receiveGeneric, listConfigs, createConfig, verifyWhatsApp, receiveWhatsApp };

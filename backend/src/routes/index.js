@@ -63,6 +63,8 @@ router.post('/automations/:id/test', authenticate, automationCtrl.test);
 // --- WEBHOOKS (receber leads externos) ---
 router.get('/webhook/meta', webhookCtrl.verifyMeta);
 router.post('/webhook/meta', webhookLimiter, webhookCtrl.receiveMeta);
+router.get('/webhook/whatsapp', webhookCtrl.verifyWhatsApp);
+router.post('/webhook/whatsapp', webhookLimiter, webhookCtrl.receiveWhatsApp);
 router.post('/webhook/lead/:token', webhookLimiter, webhookCtrl.receiveGeneric);
 router.get('/webhook/configs', authenticate, webhookCtrl.listConfigs);
 router.post('/webhook/configs', authenticate, webhookCtrl.createConfig);
