@@ -90,6 +90,9 @@ export default function AccountsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">{acc.name}</p>
+                    {acc.business_name && (
+                      <p className="text-xs text-blue-500 truncate">📁 {acc.business_name}</p>
+                    )}
                     <p className="text-xs text-gray-400 font-mono">{acc.id}</p>
                   </div>
                   {spent && <span className="text-xs text-gray-500 hidden sm:block">Gasto: {spent}</span>}

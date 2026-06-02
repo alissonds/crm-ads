@@ -5,18 +5,51 @@ const axios = require('axios');
 const GRAPH_URL = 'https://graph.facebook.com/v19.0';
 
 // Lista todas as contas de anúncio que o admin gerencia via Meta API
+// Busca de /me/adaccounts + todos os portfólios empresariais (BMs)
 async function listMetaAccounts(req, res) {
   try {
     const token = process.env.META_ACCESS_TOKEN;
     if (!token) return res.status(400).json({ error: 'META_ACCESS_TOKEN não configurado' });
 
-    const { data } = await axios.get(`${GRAPH_URL}/me/adaccounts`, {
-      params: {
-        access_token: token,
-        fields: 'id,name,account_status,currency,spend_cap,amount_spent,balance',
-        limit: 100,
-      },
-    });
+    const fields = 'id,name,account_status,currency,amount_spent,balance';
+    const accountMap = {};
+
+    // 1. Contas pessoais do usuário
+    try {
+      const { data: personal } = await axios.get(`${GRAPH_URL}/me/adaccounts`, {
+        params: { access_token: token, fields, limit: 200 },
+      });
+      for (const acc of personal.data || []) accountMap[acc.id] = acc;
+    } catch {}
+
+    // 2. Portfólios empresariais (Business Managers)
+    try {
+      const { data: bizData } = await axios.get(`${GRAPH_URL}/me/businesses`, {
+        params: { access_token: token, fields: 'id,name', limit: 50 },
+      });
+
+      await Promise.all((bizData.data || []).map(async (biz) => {
+        // Contas próprias do portfólio
+        try {
+          const { data: owned } = await axios.get(`${GRAPH_URL}/${biz.id}/owned_ad_accounts`, {
+            params: { access_token: token, fields, limit: 200 },
+          });
+          for (const acc of owned.data || []) {
+            accountMap[acc.id] = { ...acc, business_name: biz.name, business_id: biz.id };
+          }
+        } catch {}
+
+        // Contas clientes do portfólio
+        try {
+          const { data: client } = await axios.get(`${GRAPH_URL}/${biz.id}/client_ad_accounts`, {
+            params: { access_token: token, fields, limit: 200 },
+          });
+          for (const acc of client.data || []) {
+            accountMap[acc.id] = { ...acc, business_name: biz.name, business_id: biz.id };
+          }
+        } catch {}
+      }));
+    } catch {}
 
     // Busca configurações já salvas para cruzar com os dados da API
     const { rows: configs } = await db.query(
@@ -24,14 +57,16 @@ async function listMetaAccounts(req, res) {
        FROM client_configs cc
        JOIN users u ON cc.user_id = u.id`
     );
-
     const configMap = {};
     for (const c of configs) configMap[c.meta_ad_account_id] = c;
 
-    const accounts = (data.data || []).map(acc => ({
+    const accounts = Object.values(accountMap).map(acc => ({
       ...acc,
       assigned_config: configMap[acc.id] || null,
     }));
+
+    // Ordena por nome
+    accounts.sort((a, b) => (a.business_name || '').localeCompare(b.business_name || '') || a.name.localeCompare(b.name));
 
     res.json({ accounts, total: accounts.length });
   } catch (err) {
