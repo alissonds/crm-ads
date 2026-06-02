@@ -5,13 +5,17 @@ const attribution = require('../services/attributionService');
 
 async function list(req, res) {
   try {
-    const { platform, status, limit = 50, page = 1, ad_account_id } = req.query;
+    const { platform, status, limit = 50, page = 1 } = req.query;
+    const effectiveAccountId = req.user.role !== 'admin'
+      ? req.user.meta_ad_account_id
+      : (req.query.ad_account_id || null);
+
     const conditions = [];
     const params = [];
     let p = 1;
     if (platform) { conditions.push(`platform = $${p++}`); params.push(platform); }
     if (status) { conditions.push(`status = $${p++}`); params.push(status); }
-    if (ad_account_id) { conditions.push(`raw_data->>'ad_account_id' = $${p++}`); params.push(ad_account_id); }
+    if (effectiveAccountId) { conditions.push(`raw_data->>'ad_account_id' = $${p++}`); params.push(effectiveAccountId); }
 
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
     const offset = (parseInt(page) - 1) * parseInt(limit);
