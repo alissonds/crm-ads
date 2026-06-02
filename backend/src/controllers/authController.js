@@ -76,16 +76,13 @@ async function register(req, res) {
     }
 
     const hash = await bcrypt.hash(password, 10);
+    // Armazena dados extras no avatar_url como JSON temporário (sem migração de schema)
+    const extraData = JSON.stringify({ whatsapp_number: whatsapp_number || null, company: company || null });
     const { rows } = await db.query(`
-      INSERT INTO users (name, email, password_hash, role, is_active, custom_fields, created_at, updated_at)
+      INSERT INTO users (name, email, password_hash, role, is_active, avatar_url, created_at, updated_at)
       VALUES ($1, $2, $3, 'agent', false, $4, NOW(), NOW())
-      RETURNING id, name, email, role, is_active, created_at
-    `, [
-      name,
-      email.toLowerCase().trim(),
-      hash,
-      JSON.stringify({ whatsapp_number: whatsapp_number || null, company: company || null, pending_approval: true }),
-    ]);
+      RETURNING id, name, email, role, is_active, created_at, avatar_url
+    `, [name, email.toLowerCase().trim(), hash, extraData]);
 
     res.status(201).json({ message: 'Cadastro enviado! Aguarde a aprovação do administrador.', user: rows[0] });
   } catch (err) {

@@ -130,7 +130,9 @@ export default function UsersPage() {
           </h2>
           <div className="bg-white rounded-xl border border-amber-200 divide-y divide-amber-50">
             {pending.map((u) => {
-              const extra = u.custom_fields || {};
+              let extra = {};
+              try { extra = JSON.parse(u.avatar_url || '{}'); } catch {}
+              if (typeof extra !== 'object' || extra === null) extra = {};
               return (
                 <div key={u.id} className="flex items-center gap-4 px-5 py-4">
                   <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
