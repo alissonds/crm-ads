@@ -57,6 +57,9 @@ class MetaAdsService {
       if (!accounts.length && this.adAccountId) accounts = [{ id: this.adAccountId }];
     }
 
+    const dailySince = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+    const dailyUntil = new Date().toISOString().slice(0, 10);
+
     let total = 0;
     for (const account of accounts) {
       try {
@@ -100,6 +103,47 @@ class MetaAdsService {
             JSON.stringify({ campaign: c, insights, ad_account_id: account.id }),
           ]);
           total++;
+
+          // Salva métricas diárias para filtros por data
+          try {
+            const { rows: [camp] } = await db.query(
+              `SELECT id FROM campaigns WHERE external_id = $1 AND platform = 'meta_ads'`,
+              [c.id]
+            );
+            if (camp) {
+              const dailyRes = await this.get(`/${c.id}/insights`, {
+                fields: insightsFields,
+                time_increment: 1,
+                time_range: JSON.stringify({ since: dailySince, until: dailyUntil }),
+                level: 'campaign',
+                limit: 100,
+              });
+
+              const dailyRows = dailyRes.data || [];
+              if (dailyRows.length) {
+                await db.query(
+                  `DELETE FROM daily_metrics WHERE campaign_id = $1 AND platform = 'meta_ads' AND date BETWEEN $2 AND $3 AND ad_group_id IS NULL AND keyword_id IS NULL`,
+                  [camp.id, dailySince, dailyUntil]
+                );
+                for (const day of dailyRows) {
+                  const ds = parseFloat(day.spend || 0);
+                  const dcv = parseFloat(day.action_values?.find(a => a.action_type === 'purchase')?.value || 0);
+                  await db.query(`
+                    INSERT INTO daily_metrics (id, date, platform, campaign_id, impressions, clicks, spend, conversion_value, roas, cpc, ctr, created_at)
+                    VALUES (uuid_generate_v4(), $1, 'meta_ads', $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+                  `, [
+                    day.date_start, camp.id,
+                    parseInt(day.impressions || 0), parseInt(day.clicks || 0),
+                    ds, dcv,
+                    ds > 0 ? dcv / ds : null,
+                    parseFloat(day.cpc || 0), parseFloat(day.ctr || 0),
+                  ]);
+                }
+              }
+            }
+          } catch (err) {
+            console.error(`Erro ao salvar métricas diárias para campanha ${c.id}:`, err.message);
+          }
         }
       } catch (err) {
         console.error(`Erro ao sincronizar conta ${account.id}:`, err.message);

@@ -84,6 +84,58 @@ async function syncMeta(req, res) {
   }
 }
 
+async function getInsights(req, res) {
+  try {
+    const { date_from, date_to, platform, ad_account_id } = req.query;
+    const df = date_from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const dt = date_to || new Date().toISOString().slice(0, 10);
+
+    const conditions = [];
+    const params = [df, dt];
+    let p = 3;
+
+    if (platform) { conditions.push(`c.platform = $${p++}`); params.push(platform); }
+    if (ad_account_id) { conditions.push(`c.raw_data->>'ad_account_id' = $${p++}`); params.push(ad_account_id); }
+
+    const where = conditions.length ? 'AND ' + conditions.join(' AND ') : '';
+
+    const { rows } = await db.query(`
+      SELECT
+        c.id, c.name, c.platform, c.status,
+        COALESCE(SUM(dm.impressions), 0)::bigint AS impressions,
+        COALESCE(SUM(dm.clicks), 0)::bigint AS clicks,
+        COALESCE(SUM(dm.spend), 0) AS spend,
+        COALESCE(SUM(dm.conversion_value), 0) AS conversion_value,
+        CASE WHEN SUM(dm.clicks) > 0 THEN SUM(dm.spend) / SUM(dm.clicks) ELSE 0 END AS cpc,
+        CASE WHEN SUM(dm.impressions) > 0 THEN SUM(dm.clicks)::DECIMAL / SUM(dm.impressions) * 100 ELSE 0 END AS ctr,
+        CASE WHEN SUM(dm.spend) > 0 THEN SUM(dm.conversion_value) / SUM(dm.spend) ELSE NULL END AS roas,
+        COUNT(DISTINCT l.id) AS crm_leads,
+        SUM(l.actual_value) FILTER (WHERE l.status = 'won') AS crm_revenue,
+        (COUNT(dm.id) > 0) AS has_daily_data
+      FROM campaigns c
+      LEFT JOIN daily_metrics dm
+        ON dm.campaign_id = c.id
+        AND dm.date BETWEEN $1 AND $2
+        AND dm.ad_group_id IS NULL
+        AND dm.keyword_id IS NULL
+      LEFT JOIN leads l
+        ON l.campaign_id = c.id
+        AND l.created_at >= $1::timestamp
+        AND l.created_at < ($2::date + interval '1 day')
+      WHERE 1=1 ${where}
+      GROUP BY c.id
+      ORDER BY COALESCE(SUM(dm.spend), 0) DESC, c.spend DESC NULLS LAST
+    `, params);
+
+    const hasDailyData = rows.some(r => r.has_daily_data);
+
+    res.json({ campaigns: rows, period: { from: df, to: dt }, has_daily_data: hasDailyData });
+  } catch (err) {
+    console.error('getInsights error:', err);
+    res.status(500).json({ error: 'Erro ao buscar insights por período' });
+  }
+}
+
 async function getRoas(req, res) {
   try {
     const { id } = req.params;
@@ -99,4 +151,4 @@ async function getRoas(req, res) {
   }
 }
 
-module.exports = { list, getById, syncGoogle, syncMeta, getRoas };
+module.exports = { list, getById, syncGoogle, syncMeta, getRoas, getInsights };

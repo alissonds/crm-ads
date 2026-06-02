@@ -24,8 +24,11 @@ export const useAuthStore = create((set, get) => ({
     try {
       const { data } = await authAPI.me();
       set({ user: data.user });
-    } catch {
-      get().logout();
+    } catch (err) {
+      // Só faz logout em erro de autenticação (401), não em erros de rede
+      if (err?.response?.status === 401) {
+        get().logout();
+      }
     }
   },
 }));

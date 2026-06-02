@@ -212,7 +212,7 @@ export default function DashboardPage() {
                     <td className="px-4 py-3 text-gray-700">{fmt(c.crm_leads)}</td>
                     <td className="px-4 py-3 text-gray-700">{fmtR(c.spend)}</td>
                     <td className="px-4 py-3 text-gray-700">{fmtR(c.cpa)}</td>
-                    <td className="px-4 py-3 font-semibold text-green-600">{c.roas ? c.roas.toFixed(2) + 'x' : '—'}</td>
+                    <td className="px-4 py-3 font-semibold text-green-600">{c.roas ? parseFloat(c.roas).toFixed(2) + 'x' : '—'}</td>
                   </tr>
                 ))}
               </tbody>

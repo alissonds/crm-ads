@@ -58,6 +58,7 @@ export const analyticsAPI = {
 // Campaigns
 export const campaignsAPI = {
   list: (params) => api.get('/campaigns', { params }),
+  getInsights: (params) => api.get('/campaigns/insights', { params }),
   getById: (id) => api.get(`/campaigns/${id}`),
   syncGoogle: () => api.post('/campaigns/sync/google'),
   syncMeta: (adAccountId) => api.post(`/campaigns/sync/meta${adAccountId ? `?ad_account_id=${adAccountId}` : ''}`),
