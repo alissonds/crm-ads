@@ -13,8 +13,9 @@ class MetaAdsService {
   }
 
   async get(path, params = {}) {
+    const token = process.env.META_ACCESS_TOKEN || this.accessToken;
     const res = await axios.get(`${GRAPH_URL}${path}`, {
-      params: { access_token: this.accessToken, ...params },
+      params: { access_token: token, ...params },
     });
     return res.data;
   }
