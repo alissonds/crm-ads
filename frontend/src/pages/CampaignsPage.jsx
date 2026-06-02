@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, TrendingUp, BarChart3, Megaphone } from 'lucide-react';
 import { campaignsAPI } from '../services/api';
+import { useAccountStore } from '../store/accountStore';
 import toast from 'react-hot-toast';
 
 const fmt = (n) => n == null ? '—' : Number(n).toLocaleString('pt-BR');
@@ -10,11 +11,14 @@ const fmtPct = (n) => n == null ? '—' : Number(n).toFixed(2) + '%';
 
 export default function CampaignsPage() {
   const [platform, setPlatform] = useState('');
+  const { selected } = useAccountStore();
   const qc = useQueryClient();
 
+  const adAccountId = selected.id !== '__all__' ? selected.meta_ad_account_id : undefined;
+
   const { data, isLoading } = useQuery({
-    queryKey: ['campaigns', platform],
-    queryFn: () => campaignsAPI.list({ platform, limit: 100 }).then(r => r.data),
+    queryKey: ['campaigns', platform, adAccountId],
+    queryFn: () => campaignsAPI.list({ platform, limit: 100, ad_account_id: adAccountId }).then(r => r.data),
   });
 
   const syncGoogleMutation = useMutation({

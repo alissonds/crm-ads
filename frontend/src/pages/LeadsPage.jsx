@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, ChevronDown, MessageCircle, Tag, Star, Users } from 'lucide-react';
 import { leadsAPI } from '../services/api';
+import { useAccountStore } from '../store/accountStore';
+import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
@@ -36,14 +38,21 @@ const SOURCE_ICON = {
 export default function LeadsPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { selected } = useAccountStore();
+  const { user } = useAuthStore();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
 
+  // Admin filtra pela conta selecionada; clientes sempre veem só os próprios
+  const assignedFilter = user?.role === 'admin' && selected.id !== '__all__'
+    ? selected.user_id
+    : undefined;
+
   const { data, isLoading } = useQuery({
-    queryKey: ['leads', { search, status, page }],
-    queryFn: () => leadsAPI.list({ search, status, page, limit: 30 }).then(r => r.data),
+    queryKey: ['leads', { search, status, page, assignedFilter }],
+    queryFn: () => leadsAPI.list({ search, status, page, limit: 30, assigned_to: assignedFilter }).then(r => r.data),
     keepPreviousData: true,
   });
 
