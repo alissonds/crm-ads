@@ -31,7 +31,7 @@ export default function CampaignsPage() {
   });
 
   const syncMetaMutation = useMutation({
-    mutationFn: () => campaignsAPI.syncMeta(),
+    mutationFn: () => campaignsAPI.syncMeta(adAccountId),
     onSuccess: (res) => {
       qc.invalidateQueries(['campaigns']);
       toast.success(res.data.message);

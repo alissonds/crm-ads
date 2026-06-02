@@ -60,7 +60,7 @@ export const campaignsAPI = {
   list: (params) => api.get('/campaigns', { params }),
   getById: (id) => api.get(`/campaigns/${id}`),
   syncGoogle: () => api.post('/campaigns/sync/google'),
-  syncMeta: () => api.post('/campaigns/sync/meta'),
+  syncMeta: (adAccountId) => api.post(`/campaigns/sync/meta${adAccountId ? `?ad_account_id=${adAccountId}` : ''}`),
   getRoas: (id, params) => api.get(`/campaigns/${id}/roas`, { params }),
 };
 

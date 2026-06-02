@@ -20,73 +20,91 @@ class MetaAdsService {
   }
 
   // Sincroniza campanhas Meta
-  async syncCampaigns() {
-    const fields = [
-      'id', 'name', 'status', 'objective',
-      'daily_budget', 'lifetime_budget', 'budget_remaining',
-      'start_time', 'stop_time',
-    ].join(',');
+  // Busca todas as contas de anúncio disponíveis via API
+  async getAllAdAccounts() {
+    const accountMap = {};
+    try {
+      const { data } = await this.get('/me/adaccounts', { fields: 'id,name', limit: 200 });
+      for (const a of data?.data || []) accountMap[a.id] = a;
+    } catch {}
+    try {
+      const { data: biz } = await this.get('/me/businesses', { fields: 'id,name', limit: 50 });
+      await Promise.all((biz?.data || []).map(async (b) => {
+        for (const endpoint of ['owned_ad_accounts', 'client_ad_accounts']) {
+          try {
+            const { data: accs } = await this.get(`/${b.id}/${endpoint}`, { fields: 'id,name', limit: 200 });
+            for (const a of accs?.data || []) accountMap[a.id] = { ...a, business_name: b.name };
+          } catch {}
+        }
+      }));
+    } catch {}
+    return Object.values(accountMap);
+  }
 
-    const insightsFields = [
-      'impressions', 'clicks', 'spend', 'actions', 'action_values',
-      'ctr', 'cpc', 'cpm', 'cpp', 'frequency',
-    ].join(',');
+  async syncCampaigns(adAccountId = null) {
+    const fields = ['id', 'name', 'status', 'objective', 'daily_budget', 'lifetime_budget', 'budget_remaining', 'start_time', 'stop_time'].join(',');
+    const insightsFields = ['impressions', 'clicks', 'spend', 'actions', 'action_values', 'ctr', 'cpc', 'cpm'].join(',');
 
-    const data = await this.get(`/${this.adAccountId}/campaigns`, {
-      fields,
-      limit: 200,
-    });
+    const { rows: [source] } = await db.query(`SELECT id FROM traffic_sources WHERE type = 'meta_ads' LIMIT 1`);
 
-    const { rows: [source] } = await db.query(
-      `SELECT id FROM traffic_sources WHERE type = 'meta_ads' LIMIT 1`
-    );
-
-    for (const c of data.data || []) {
-      // Busca insights separadamente
-      let insights = {};
-      try {
-        const insRes = await this.get(`/${c.id}/insights`, {
-          fields: insightsFields,
-          date_preset: 'last_30d',
-          level: 'campaign',
-        });
-        insights = insRes.data?.[0] || {};
-      } catch {}
-
-      const spend = parseFloat(insights.spend || 0);
-      const conversions = insights.actions?.find(a => a.action_type === 'purchase')?.value || 0;
-      const convValue = insights.action_values?.find(a => a.action_type === 'purchase')?.value || 0;
-      const cpa = spend > 0 && conversions > 0 ? spend / conversions : null;
-      const roas = spend > 0 ? convValue / spend : null;
-
-      await db.query(`
-        INSERT INTO campaigns (id, external_id, traffic_source_id, name, platform, status, objective,
-          budget_daily, budget_lifetime, start_date, end_date,
-          impressions, clicks, spend, conversions, conversion_value,
-          cpc, cpm, ctr, cpa, roas, raw_data, last_synced_at, created_at, updated_at)
-        VALUES ($1,$2,$3,$4,'meta_ads',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,NOW(),NOW(),NOW())
-        ON CONFLICT (external_id, platform) DO UPDATE SET
-          name = EXCLUDED.name, status = EXCLUDED.status,
-          impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
-          spend = EXCLUDED.spend, conversions = EXCLUDED.conversions,
-          conversion_value = EXCLUDED.conversion_value,
-          cpc = EXCLUDED.cpc, cpm = EXCLUDED.cpm, ctr = EXCLUDED.ctr,
-          cpa = EXCLUDED.cpa, roas = EXCLUDED.roas,
-          raw_data = EXCLUDED.raw_data, last_synced_at = NOW(), updated_at = NOW()
-      `, [
-        uuidv4(), c.id, source?.id, c.name, c.status?.toLowerCase() || 'active', c.objective,
-        c.daily_budget ? parseFloat(c.daily_budget) / 100 : null,
-        c.lifetime_budget ? parseFloat(c.lifetime_budget) / 100 : null,
-        c.start_time?.slice(0, 10), c.stop_time?.slice(0, 10),
-        parseInt(insights.impressions || 0), parseInt(insights.clicks || 0),
-        spend, parseInt(conversions), parseFloat(convValue),
-        parseFloat(insights.cpc || 0), parseFloat(insights.cpm || 0),
-        parseFloat(insights.ctr || 0), cpa, roas,
-        JSON.stringify({ campaign: c, insights }),
-      ]);
+    // Se passou uma conta específica, sincroniza só ela. Senão, todas.
+    let accounts = [];
+    if (adAccountId) {
+      accounts = [{ id: adAccountId }];
+    } else {
+      accounts = await this.getAllAdAccounts();
+      if (!accounts.length && this.adAccountId) accounts = [{ id: this.adAccountId }];
     }
 
-    return data.data?.length || 0;
+    let total = 0;
+    for (const account of accounts) {
+      try {
+        const data = await this.get(`/${account.id}/campaigns`, { fields, limit: 200 });
+        for (const c of data.data || []) {
+          let insights = {};
+          try {
+            const insRes = await this.get(`/${c.id}/insights`, { fields: insightsFields, date_preset: 'last_30d', level: 'campaign' });
+            insights = insRes.data?.[0] || {};
+          } catch {}
+
+          const spend = parseFloat(insights.spend || 0);
+          const conversions = insights.actions?.find(a => a.action_type === 'purchase')?.value || 0;
+          const convValue = insights.action_values?.find(a => a.action_type === 'purchase')?.value || 0;
+          const cpa = spend > 0 && conversions > 0 ? spend / conversions : null;
+          const roas = spend > 0 ? convValue / spend : null;
+
+          await db.query(`
+            INSERT INTO campaigns (id, external_id, traffic_source_id, name, platform, status, objective,
+              budget_daily, budget_lifetime, start_date, end_date,
+              impressions, clicks, spend, conversions, conversion_value,
+              cpc, cpm, ctr, cpa, roas, raw_data, last_synced_at, created_at, updated_at)
+            VALUES ($1,$2,$3,$4,'meta_ads',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,NOW(),NOW(),NOW())
+            ON CONFLICT (external_id, platform) DO UPDATE SET
+              name = EXCLUDED.name, status = EXCLUDED.status,
+              impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
+              spend = EXCLUDED.spend, conversions = EXCLUDED.conversions,
+              conversion_value = EXCLUDED.conversion_value,
+              cpc = EXCLUDED.cpc, cpm = EXCLUDED.cpm, ctr = EXCLUDED.ctr,
+              cpa = EXCLUDED.cpa, roas = EXCLUDED.roas,
+              raw_data = EXCLUDED.raw_data, last_synced_at = NOW(), updated_at = NOW()
+          `, [
+            uuidv4(), c.id, source?.id, c.name, c.status?.toLowerCase() || 'active', c.objective,
+            c.daily_budget ? parseFloat(c.daily_budget) / 100 : null,
+            c.lifetime_budget ? parseFloat(c.lifetime_budget) / 100 : null,
+            c.start_time?.slice(0, 10), c.stop_time?.slice(0, 10),
+            parseInt(insights.impressions || 0), parseInt(insights.clicks || 0),
+            spend, parseInt(conversions), parseFloat(convValue),
+            parseFloat(insights.cpc || 0), parseFloat(insights.cpm || 0),
+            parseFloat(insights.ctr || 0), cpa, roas,
+            JSON.stringify({ campaign: c, insights, ad_account_id: account.id }),
+          ]);
+          total++;
+        }
+      } catch (err) {
+        console.error(`Erro ao sincronizar conta ${account.id}:`, err.message);
+      }
+    }
+    return total;
   }
 
   // Envia evento de Conversão para Meta (Conversions API)

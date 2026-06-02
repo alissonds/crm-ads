@@ -75,7 +75,8 @@ async function syncGoogle(req, res) {
 
 async function syncMeta(req, res) {
   try {
-    const count = await metaAds.syncCampaigns();
+    const { ad_account_id } = req.query;
+    const count = await metaAds.syncCampaigns(ad_account_id || null);
     res.json({ synced: count, message: `${count} campanhas sincronizadas do Meta Ads` });
   } catch (err) {
     console.error('Meta Ads sync error:', err);
